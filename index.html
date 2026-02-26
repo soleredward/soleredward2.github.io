@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mapa Mental Interactivo SVI - Detallado</title>
+    <style>
+        :root {
+            --bg-color: #f8fafc;
+            --primary: #2563eb;
+            --secondary: #3b82f6;
+            --accent: #0f172a;
+            --success: #10b981;
+            --text-main: #1e293b;
+            --text-muted: #64748b;
+            --white: #ffffff;
+            --shadow: 0 10px 15px -3px rgba(0,0,0,0.1);
+        }
+
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --bg-color: #0f172a;
+                --white: #1e293b;
+                --text-main: #f1f5f9;
+                --text-muted: #94a3b8;
+                --shadow: 0 10px 15px -3px rgba(0,0,0,0.5);
+            }
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', system-ui, sans-serif; }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            height: 100vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        header {
+            padding: 1.2rem;
+            text-align: center;
+            background: var(--white);
+            border-bottom: 1px solid rgba(0,0,0,0.1);
+            z-index: 10;
+        }
+
+        header h1 { font-size: 1.4rem; color: var(--primary); margin-bottom: 4px; }
+        header p { font-size: 0.85rem; color: var(--text-muted); }
+
+        #viewport {
+            flex-grow: 1;
+            position: relative;
+            overflow: auto;
+            cursor: grab;
+            background-image: radial-gradient(var(--text-muted) 0.5px, transparent 0.5px);
+            background-size: 40px 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        #container { position: relative; width: 1300px; height: 900px; }
+
+        svg { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
+
+        .node {
+            position: absolute;
+            padding: 14px 22px;
+            background: var(--white);
+            border-radius: 12px;
+            box-shadow: var(--shadow);
+            cursor: pointer;
+            z-index: 2;
+            transition: all 0.3s ease;
+            max-width: 200px;
+            text-align: center;
+            font-weight: 600;
+            border: 2px solid transparent;
+        }
+
+        .node:hover { transform: translateY(-5px); border-color: var(--primary); }
+        .node.root { background: var(--primary); color: white; font-size: 1.1rem; padding: 20px; border-radius: 50px; }
+        .node.branch { border-bottom: 4px solid var(--primary); font-size: 0.9rem; }
+        .node.leaf { font-weight: 400; font-size: 0.85rem; color: var(--text-main); border: 1px solid #e2e8f0; }
+
+        .connector { fill: none; stroke: var(--primary); stroke-width: 2; opacity: 0.3; }
+
+        /* Panel de Información Mejorado */
+        #info-card {
+            position: fixed;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%) translateY(150%);
+            width: 90%;
+            max-width: 500px;
+            background: var(--white);
+            padding: 25px;
+            border-radius: 20px;
+            box-shadow: 0 20px 25px -5px rgba(0,0,0,0.2);
+            z-index: 100;
+            transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            border-top: 5px solid var(--primary);
+        }
+
+        #info-card.active { transform: translateX(-50%) translateY(0); }
+        #info-card h3 { color: var(--primary); margin-bottom: 10px; font-size: 1.2rem; }
+        #info-card p { font-size: 0.95rem; line-height: 1.6; color: var(--text-main); }
+        #info-card .close-btn { 
+            position: absolute; top: 10px; right: 15px; 
+            cursor: pointer; color: var(--text-muted); font-size: 1.2rem;
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>SÍNDROME DE VISIÓN INFORMÁTICA</h1>
+        <p>Haz clic en los elementos para ver la información detallada</p>
+    </header>
+
+    <main id="viewport">
+        <div id="container">
+            <svg id="canvas"></svg>
+            <div id="nodes-layer"></div>
+        </div>
+    </main>
+
+    <div id="info-card">
+        <span class="close-btn" onclick="closeCard()">&times;</span>
+        <h3 id="info-title">Título</h3>
+        <p id="info-body">Contenido detallado aquí.</p>
+    </div>
+
+    <script>
+        // Base de datos de información personalizada
+        const infoDB = {
+            "root": {
+                title: "SVI: Riesgo Físico Laboral",
+                text: "Es una condición temporal resultante de enfocar los ojos en pantallas de computadora u otros dispositivos digitales por periodos prolongados. No es una enfermedad ocular única, sino una gama de fatiga y molestias oculares."
+            },
+            "b1": {
+                title: "Categoría: Síntomas Comunes",
+                text: "Son las señales de alerta que el cuerpo envía. Identificarlas a tiempo evita que la fatiga visual se convierta en un problema crónico de productividad."
+            },
+            "l1": {
+                title: "Ojo Seco e Irritación",
+                text: "Al mirar pantallas, la frecuencia de parpadeo baja de 15 a solo 5 veces por minuto. Esto rompe la película lagrimal, causando ardor, enrojecimiento y sensación de arenilla."
+            },
+            "l2": {
+                title: "Visión Borrosa o Doble",
+                text: "Los músculos ciliares (que enfocan el ojo) se fatigan por mantener una distancia fija. Esto causa dificultad para enfocar objetos lejanos al terminar de trabajar."
+            },
+            "l3": {
+                title: "Dolor Cervical y de Hombros",
+                text: "Para compensar la mala visión o los reflejos, solemos inclinar el cuello hacia adelante (posición de tortuga), generando contracturas en el trapecio y la zona cervical."
+            },
+            "b2": {
+                title: "Categoría: Causas Técnicas",
+                text: "Factores del entorno laboral y la configuración de los equipos que obligan al ojo a realizar un esfuerzo extra innecesario."
+            },
+            "l4": {
+                title: "Brillo Excesivo (Glare)",
+                text: "Si la pantalla es más brillante que el entorno, el ojo se deslumbra. El contraste excesivo agota los fotorreceptores de la retina rápidamente."
+            },
+            "l5": {
+                title: "Distancia Inadecuada",
+                text: "La distancia ideal es de 50 a 70 cm. Estar más cerca obliga a una 'convergencia' excesiva de los ojos, causando tensión muscular ocular inmediata."
+            },
+            "b3": {
+                title: "Categoría: Estrategias de Prevención",
+                text: "Conjunto de hábitos ergonómicos y pausas activas diseñados para resetear la fatiga visual durante la jornada."
+            },
+            "l7": {
+                title: "La Regla 20-20-20",
+                text: "El estándar de oro: Cada 20 minutos, mira a un objeto situado a 6 metros (20 pies) durante 20 segundos. Esto relaja el músculo del enfoque por completo."
+            },
+            "l8": {
+                title: "Ergonomía del Puesto",
+                text: "El borde superior del monitor debe estar al nivel de los ojos. Así, la mirada se dirige ligeramente hacia abajo, exponiendo menos superficie del ojo al aire y reduciendo la sequedad."
+            },
+            "l9": {
+                title: "Parpadeo Consciente",
+                text: "Entrenar el parpadeo voluntario mientras leemos. Ayuda a bombear las glándulas de Meibomio, manteniendo el ojo lubricado de forma natural sin necesidad de gotas."
+            },
+            "b4": {
+                title: "Impacto a Largo Plazo",
+                text: "Si no se aplican medidas preventivas, el SVI puede derivar en problemas de salud crónicos que afectan la calidad de vida fuera del trabajo."
+            },
+            "l10": {
+                title: "Miopía Progresiva / Agravada",
+                text: "Aunque se discute si causa miopía, el esfuerzo cercano constante puede aumentar la fatiga visual en personas con defectos refractivos no corregidos."
+            },
+            "l11": {
+                title: "Fatiga Crónica y Estrés",
+                text: "El esfuerzo visual constante consume energía mental. Al final del día, esto se traduce en irritabilidad, menor concentración y agotamiento físico general."
+            }
+        };
+
+        const data = {
+            id: "root", text: "SVI: RIESGOS FÍSICOS", type: "root", x: 650, y: 450,
+            children: [
+                {
+                    id: "b1", text: "SÍNTOMAS COMUNES", type: "branch", x: 350, y: 250,
+                    children: [
+                        { id: "l1", text: "Ojo Seco e Irritación", type: "leaf", x: 150, y: 150 },
+                        { id: "l2", text: "Visión Borrosa", type: "leaf", x: 150, y: 250 },
+                        { id: "l3", text: "Dolor Cervical", type: "leaf", x: 150, y: 350 }
+                    ]
+                },
+                {
+                    id: "b2", text: "CAUSAS TÉCNICAS", type: "branch", x: 350, y: 650,
+                    children: [
+                        { id: "l4", text: "Brillo Excesivo", type: "leaf", x: 150, y: 600 },
+                        { id: "l5", text: "Distancia Inadecuada", type: "leaf", x: 150, y: 700 }
+                    ]
+                },
+                {
+                    id: "b3", text: "PREVENCIÓN", type: "branch", x: 950, y: 250,
+                    children: [
+                        { id: "l7", text: "Regla 20-20-20", type: "leaf", x: 1150, y: 150 },
+                        { id: "l8", text: "Ergonomía", type: "leaf", x: 1150, y: 250 },
+                        { id: "l9", text: "Parpadeo", type: "leaf", x: 1150, y: 350 }
+                    ]
+                },
+                {
+                    id: "b4", text: "LARGO PLAZO", type: "branch", x: 950, y: 650,
+                    children: [
+                        { id: "l10", text: "Miopía Agravada", type: "leaf", x: 1150, y: 600 },
+                        { id: "l11", text: "Fatiga Crónica", type: "leaf", x: 1150, y: 700 }
+                    ]
+                }
+            ]
+        };
+
+        const nodesLayer = document.getElementById('nodes-layer');
+        const canvas = document.getElementById('canvas');
+        const card = document.getElementById('info-card');
+        const titleEl = document.getElementById('info-title');
+        const bodyEl = document.getElementById('info-body');
+
+        function initMap(nodeData) {
+            const div = document.createElement('div');
+            div.className = `node ${nodeData.type}`;
+            div.id = nodeData.id;
+            div.textContent = nodeData.text;
+            div.style.left = `${nodeData.x}px`;
+            div.style.top = `${nodeData.y}px`;
+            div.style.transform = 'translate(-50%, -50%)';
+
+            div.onclick = (e) => {
+                e.stopPropagation();
+                showInfo(nodeData.id);
+            };
+
+            nodesLayer.appendChild(div);
+
+            if (nodeData.children) {
+                nodeData.children.forEach(child => {
+                    initMap(child);
+                    const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+                    const d = `M ${nodeData.x} ${nodeData.y} C ${nodeData.x} ${child.y}, ${nodeData.x} ${child.y}, ${child.x} ${child.y}`;
+                    path.setAttribute("d", d);
+                    path.setAttribute("class", "connector");
+                    canvas.appendChild(path);
+                });
+            }
+        }
+
+        function showInfo(id) {
+            const content = infoDB[id];
+            if (content) {
+                titleEl.textContent = content.title;
+                bodyEl.textContent = content.text;
+                card.classList.add('active');
+            }
+        }
+
+        function closeCard() { card.classList.remove('active'); }
+
+        // Inicializar
+        initMap(data);
+
+        // Click fuera para cerrar
+        document.body.onclick = closeCard;
+    </script>
+</body>
+</html>
